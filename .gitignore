@@ -1,0 +1,27 @@
+# Binaries
+bin/
+main
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Environment variables
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+
+# Dependencies
+vendor/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
