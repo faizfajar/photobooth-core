@@ -33,7 +33,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		token, err := auth.ValidateToken(parts[1])
 		if err != nil || !token.Valid {
-			response.Error(c, http.StatusUnauthorized, "Token tidak valid atau kadaluwarsa", err.Error())			c.Abort()
+			response.Error(c, http.StatusUnauthorized, "Token tidak valid atau kadaluwarsa", err.Error())
 			return
 		}
 
