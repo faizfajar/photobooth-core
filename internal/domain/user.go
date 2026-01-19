@@ -11,6 +11,15 @@ type User struct {
 	Email    string    `gorm:"uniqueIndex;not null"`
 	Password string    `gorm:"not null"` // Hashed password
 }
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email" example:"admin@photobooth.com"`
+	Password string `json:"password" binding:"required" example:"password123"`
+}
+type RegisterRequest struct {
+	Name     string `json:"name" binding:"required" example:"Faiz Photobooth"`
+	Email    string `json:"email" binding:"required,email" example:"owner@photobooth.com"`
+	Password string `json:"password" binding:"required,min=6" example:"password123"`
+}
 
 // UserRepository: Kabel untuk ke Database
 type UserRepository interface {

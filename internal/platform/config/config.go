@@ -28,5 +28,9 @@ func LoadConfig() *Config {
 		os.Exit(1)
 	}
 
+	if cfg.AppPort == "" {
+		cfg.AppPort = "8080"
+	}
+
 	return cfg
 }

@@ -19,7 +19,15 @@ func NewUserHandler(u domain.UserUsecase) *UserHandler {
 	}
 }
 
-// Login menangani permintaan masuk untuk autentikasi admin.
+// Login godoc
+// @Summary      User Login
+// @Tags         auth
+// @Accept       json
+// @Produce      json
+// @Param        request  body      domain.LoginRequest  true  "Kredensial Login"
+// @Success      200      {object}  response.Response
+// @Failure      401      {object}  response.ErrorResponse
+// @Router       /api/v1/login [post]
 func (h *UserHandler) Login(c *gin.Context) {
 	var req struct {
 		Name     string `json:"name" binding:"required,name"`
