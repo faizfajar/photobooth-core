@@ -25,6 +25,7 @@ import (
 	"photobooth-core/internal/middleware"
 	"photobooth-core/internal/platform/config"
 	"photobooth-core/internal/platform/postgres"
+	"photobooth-core/internal/platform/response"
 
 	tHandler "photobooth-core/internal/tenant/handler"
 	tRepo "photobooth-core/internal/tenant/repository"
@@ -78,11 +79,14 @@ func main() {
 
 	// Health Check & Welcome
 	r.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"app": "Photobooth Core API", "status": "Active"})
+		response.Success(c, http.StatusOK, "Sistem SaaS Photobooth Berhasil Dijalankan", gin.H{
+			"app":    "Photobooth Core API",
+			"status": "Active",
+		})
 	})
 
 	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "UP"})
+		response.Success(c, http.StatusOK, "System is UP", nil)
 	})
 
 	// Group API Versi 1

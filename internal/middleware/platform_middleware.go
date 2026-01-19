@@ -3,6 +3,9 @@ package middleware
 import (
 	"log/slog"
 	"net/http"
+	"photobooth-core/internal/platform/response"
+
+	// "photobooth-core/internal/platform/response"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -23,9 +26,6 @@ func CORS() gin.HandlerFunc {
 func GlobalRecovery() gin.HandlerFunc {
 	return gin.CustomRecovery(func(c *gin.Context, recovered interface{}) {
 		slog.Error("RECOVERED_FROM_PANIC", "error", recovered)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"status": false,
-			"error":  "Terjadi kesalahan internal pada server",
-		})
+		response.Abort(c, http.StatusInternalServerError, "Terjadi kesalahan internal pada server", recovered)
 	})
 }

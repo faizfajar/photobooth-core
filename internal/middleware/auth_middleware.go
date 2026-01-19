@@ -18,7 +18,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		authHeader := c.GetHeader("Authorization")
 
 		if authHeader == "" {
-			response.ERROR(c, http.StatusUnauthorized, "Otorisasi diperlukan", nil)
+			response.Error(c, http.StatusUnauthorized, "Otorisasi diperlukan", nil)
 			c.Abort()
 			return
 		}
@@ -33,8 +33,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		token, err := auth.ValidateToken(parts[1])
 		if err != nil || !token.Valid {
-			response.ERROR(c, http.StatusUnauthorized, "Sesi berakhir, silakan login kembali", err.Error())
-			c.Abort()
+			response.Error(c, http.StatusUnauthorized, "Token tidak valid atau kadaluwarsa", err.Error())			c.Abort()
 			return
 		}
 

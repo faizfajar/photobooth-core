@@ -4,6 +4,7 @@ package handler
 import (
 	"net/http"
 	"photobooth-core/internal/domain"
+	"photobooth-core/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -29,27 +30,22 @@ func NewUserHandler(u domain.UserUsecase) *UserHandler {
 // @Failure      401      {object}  response.ErrorResponse
 // @Router       /api/v1/login [post]
 func (h *UserHandler) Login(c *gin.Context) {
-	var req struct {
-		Name     string `json:"name" binding:"required,name"`
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required"`
-	}
+	var req domain.LoginRequest
 
-	// Validasi input JSON
+	// validate input
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email atau password tidak valid"})
+		response.Validation(c, err)
 		return
 	}
 
 	// Memanggil logic bisnis di layer Usecase
 	token, err := h.userUsecase.Login(req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		response.Error(c, http.StatusUnauthorized, "Login gagal", "Email atau password salah")
 		return
 	}
 
-	// Mengembalikan token JWT yang berisi TenantID untuk isolasi data
-	c.JSON(http.StatusOK, gin.H{
+	response.Success(c, http.StatusOK, "Login berhasil", gin.H{
 		"token": token,
 	})
 }

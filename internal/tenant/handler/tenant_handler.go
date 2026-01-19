@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"photobooth-core/internal/domain"
+	"photobooth-core/internal/platform/response"
 
 	"github.com/gin-gonic/gin"
 )
@@ -31,28 +32,23 @@ func (h *TenantHandler) Register(c *gin.Context) {
 		Password string `json:"password" binding:"required,min=6"`
 	}
 
-	// 1. Melakukan validasi format input JSON
+	// Melakukan validasi format input JSON
 	if err := c.ShouldBindJSON(&input); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Data tidak valid. Pastikan email benar dan password minimal 6 karakter.",
-		})
+		response.Validation(c, err)
 		return
 	}
 
-	// 2. Memanggil logic bisnis di layer Usecase
+	// Memanggil logic bisnis di layer Usecase
 	// Usecase ini akan menjalankan transaksi database untuk Tenant dan User.
 	tenant, user, err := h.tenantUsecase.RegisterTenant(input.Name, input.Email, input.Password)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Gagal melakukan registrasi sistem.",
-		})
+		response.Error(c, http.StatusInternalServerError, "Gagal registrasi tenant", err.Error())
 		return
 	}
 
-	// 3. Memberikan respon sukses dengan data Tenant dan User yang terbuat
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Registrasi SaaS Berhasil",
-		"tenant":  tenant,
-		"user":    user,
+	// Memberikan respon sukses dengan data Tenant dan User yang terbuat
+	response.Success(c, http.StatusCreated, "Registrasi tenant berhasil", gin.H{
+		"tenant": tenant,
+		"user":   user,
 	})
 }
