@@ -14,6 +14,14 @@ type Tenant struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+// RegisterTenantRequest digunakan untuk membedakan nama Bisnis dan nama Owner
+type RegisterTenantRequest struct {
+	TenantName string `json:"tenant_name" binding:"required" example:"Faiz Photo Studio"`
+	AdminName  string `json:"admin_name" binding:"required" example:"Faiz Abiyyu"`
+	Email      string `json:"email" binding:"required,email" example:"faiz@example.com"`
+	Password   string `json:"password" binding:"required,min=6"`
+}
+
 type TenantSubscription struct {
 	ID               uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
 	Name             string    `gorm:"type:not null" json:"name"`
@@ -36,7 +44,7 @@ type TenantSubscriptionRepository interface {
 // TenantUsecase mendefinisikan aturan bisnis (Business logic abstraction).
 type TenantUsecase interface {
 	// RegisterTenant(name string) (*Tenant, error)
-	RegisterTenant(name, email, password string) (*Tenant, *User, error)
+	RegisterTenant(req RegisterTenantRequest) (*Tenant, *User, error)
 }
 
 type TenantPayment interface {

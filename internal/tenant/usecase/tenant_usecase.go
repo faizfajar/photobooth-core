@@ -24,8 +24,9 @@ func NewTenantUsecase(tr domain.TenantRepository, ur domain.UserRepository, db *
 	}
 }
 
-func (u *tenantUsecase) RegisterTenant(name, email, password string) (*domain.Tenant, *domain.User, error) {
-	var newTenant *domain.Tenant
+var newTenant *domain.Tenant
+
+func (u *tenantUsecase) RegisterTenant(req domain.RegisterTenantRequest) (*domain.Tenant, *domain.User, error) {
 	var newUser *domain.User
 
 	// Mulai Transaksi Database
@@ -33,24 +34,25 @@ func (u *tenantUsecase) RegisterTenant(name, email, password string) (*domain.Te
 		// Buat Objek Tenant
 		newTenant = &domain.Tenant{
 			ID:   uuid.New(),
-			Name: name,
+			Name: req.TenantName,
 		}
 		if err := u.tenantRepo.Create(newTenant); err != nil {
 			return err
 		}
 
 		// Hash Password untuk User Admin
-		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
 			return errors.New("gagal memproses password")
 		}
 
-		// Buat Objek User Admin yang terhubung ke TenantID
-		newUser = &domain.User{
+		newUser := &domain.User{
 			ID:       uuid.New(),
-			TenantID: newTenant.ID, // Hubungkan ke Tenant yang baru dibuat
-			Email:    email,
+			TenantID: newTenant.ID,
+			Name:     req.AdminName,
+			Email:    req.Email,
 			Password: string(hashedPassword),
+			Role:     "admin",
 		}
 		if err := u.userRepo.Create(newUser); err != nil {
 			return err

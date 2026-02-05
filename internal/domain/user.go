@@ -6,11 +6,14 @@ import (
 
 // User merepresentasikan tabel 'users'
 type User struct {
-	ID       uuid.UUID `gorm:"type:uuid;primaryKey"`
-	TenantID uuid.UUID `gorm:"type:uuid"`
-	Email    string    `gorm:"uniqueIndex;not null"`
-	Password string    `gorm:"not null"` // Hashed password
+	ID       uuid.UUID `gorm:"type:uuid;primaryKey" json:"id"`
+	TenantID uuid.UUID `gorm:"type:uuid;index;not null" json:"tenant_id"`
+	Name     string    `gorm:"type:varchar(100);not null" json:"name"` // <-- Pastikan ini ada
+	Email    string    `gorm:"type:varchar(100);unique;not null" json:"email"`
+	Password string    `gorm:"not null" json:"-"`
+	Role     string    `gorm:"type:varchar(20);default:'admin'" json:"role"`
 }
+
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email" example:"admin@photobooth.com"`
 	Password string `json:"password" binding:"required" example:"password123"`

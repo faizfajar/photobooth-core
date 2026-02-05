@@ -22,33 +22,34 @@ func NewTenantHandler(u domain.TenantUsecase) *TenantHandler {
 	}
 }
 
-// Register menangani pembuatan akun Tenant baru sekaligus akun User Admin pertama.
-// Fitur ini merupakan gerbang utama bagi klien SaaS Anda.
+// Register godoc
+// @Summary      Registrasi Tenant & Admin Baru
+// @Description  Membuat perusahaan (Tenant) sekaligus akun Admin pertama secara atomic
+// @Tags         Tenants
+// @Accept       json
+// @Produce      json
+// @Param        request  body      domain.RegisterTenantRequest  true  "Data Registrasi"
+// @Success      201      {object}  response.Response
+// @Router       /api/v1/tenants [post]
 func (h *TenantHandler) Register(c *gin.Context) {
-	// Definisi struct input untuk binding JSON
-	var input struct {
-		Name     string `json:"name" binding:"required"`
-		Email    string `json:"email" binding:"required,email"`
-		Password string `json:"password" binding:"required,min=6"`
-	}
+	//Inisialisasi struct request dari domain
+	var req domain.RegisterTenantRequest
 
-	// Melakukan validasi format input JSON
-	if err := c.ShouldBindJSON(&input); err != nil {
+	// Jika format JSON salah atau field yang 'required' tidak ada, ini akan error
+	if err := c.ShouldBindJSON(&req); err != nil {
 		response.Validation(c, err)
 		return
 	}
 
-	// Memanggil logic bisnis di layer Usecase
-	// Usecase ini akan menjalankan transaksi database untuk Tenant dan User.
-	tenant, user, err := h.tenantUsecase.RegisterTenant(input.Name, input.Email, input.Password)
+	tenant, user, err := h.tenantUsecase.RegisterTenant(req)
+
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "Gagal registrasi tenant", err.Error())
 		return
 	}
 
-	// Memberikan respon sukses dengan data Tenant dan User yang terbuat
-	response.Success(c, http.StatusCreated, "Registrasi tenant berhasil", gin.H{
+	response.Success(c, http.StatusCreated, "Tenant dan Admin berhasil didaftarkan", gin.H{
 		"tenant": tenant,
-		"user":   user,
+		"admin":  user,
 	})
 }
