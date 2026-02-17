@@ -16,8 +16,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -100,10 +102,18 @@ func main() {
 	r.Use(middleware.GlobalRecovery())
 	r.Use(middleware.CORS())
 
+	r.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 15 << 20)
+		c.Next()
+	})
+
+	// STATIC SERVING: Agar file di storage bisa diakses via browser/QR Code
+	r.Static("/storage", "./storage")
+
 	// Swagger Route
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// BASE ROUTES: Health & Welcome
+	// BASE ROUTES
 	r.GET("/", func(c *gin.Context) {
 		response.Success(c, http.StatusOK, "Sistem SaaS Photobooth Berhasil Dijalankan", gin.H{
 			"app":    "Photobooth Core API",
@@ -117,25 +127,81 @@ func main() {
 	// API VERSION 1
 	v1 := r.Group("/api/v1")
 	{
-		// AUTHENTICATION: Public Routes
 		v1.POST("/tenants", tenantHandler.Register)
 		v1.POST("/login", userHandler.Login)
-
-		// BOOTH HANDSHAKE: Public endpoint agar mesin bisa "Pairing" tanpa JWT user
 		v1.POST("/booths/pair", boothHandler.Pair)
 
-		// AUTHORIZED ROUTES: Perlu Bearer Token
+		v1.POST("/save-history", func(c *gin.Context) {
+			// Batasi ukuran body (Misal: max 10MB) agar server tidak hang
+			c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 10<<20) 
+
+			var input struct {
+				Image     string `json:"image"`
+				FrameName string `json:"frameName"`
+			}
+
+			if err := c.ShouldBindJSON(&input); err != nil {
+				slog.Error("Gagal bind JSON history", "error", err)
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Payload terlalu besar atau format salah"})
+				return
+			}
+
+			// Setup Folder
+			storagePath := "./storage/history"
+			if err := os.MkdirAll(storagePath, os.ModePerm); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal membuat folder storage"})
+				return
+			}
+
+			// Decode Base64
+			idx := strings.Index(input.Image, ",")
+			if idx == -1 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Format gambar tidak valid"})
+				return
+			}
+			
+			rawB64 := input.Image[idx+1:]
+			data, err := base64.StdEncoding.DecodeString(rawB64)
+			if err != nil {
+				slog.Error("Gagal decode base64", "error", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal memproses gambar"})
+				return
+			}
+
+			// Penamaan File
+			timestamp := time.Now().Unix()
+			reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+			cleanFrameName := reg.ReplaceAllString(input.FrameName, "_")
+			
+			fileName := fmt.Sprintf("%d_%s.jpg", timestamp, strings.ToLower(cleanFrameName))
+			filePath := filepath.Join(storagePath, fileName)
+
+			// Simpan ke Disk
+			if err := os.WriteFile(filePath, data, 0644); err != nil {
+				slog.Error("Gagal menulis file", "error", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Gagal menyimpan file"})
+				return
+			}
+
+			slog.Info("History saved successfully", "file", fileName)
+			c.JSON(http.StatusOK, gin.H{
+				"status": "success",
+				"file":   fileName,
+				"path":   "/storage/history/" + fileName, // Path relative untuk QR Code
+			})
+		})
+
+		// AUTHORIZED ROUTES
 		authorized := v1.Group("/")
 		authorized.Use(middleware.AuthMiddleware())
 		{
-			// BOOTH MANAGEMENT (Untuk Dashboard Owner)
-			authorized.POST("/booths", boothHandler.Register)   // Buat mesin baru
-			authorized.GET("/booths", boothHandler.GetAllBooth) // List mesin milik tenant
-
+			authorized.POST("/booths", boothHandler.Register)
+			authorized.GET("/booths", boothHandler.GetAllBooth)
 			authorized.POST("/transactions/session", middleware.DeviceOnly(), trxHandler.StartSession)
 		}
 	}
 
+	// LEGACY PRINT ROUTE
 	v1.POST("/print", func(c *gin.Context) {
 		var input struct {
 			Image string `json:"image"`
@@ -145,35 +211,18 @@ func main() {
 			return
 		}
 
-		// 1. Decode Base64 ke File
 		b64data := input.Image[strings.IndexByte(input.Image, ',')+1:]
 		data, _ := base64.StdEncoding.DecodeString(b64data)
 
 		tmpFile := "temp_print.jpg"
-		if err := os.WriteFile(tmpFile, data, 0644); err != nil {
-			c.JSON(500, gin.H{"error": "Gagal menulis file sementara"})
+		_ = os.WriteFile(tmpFile, data, 0644)
+
+		if err := executePrint(tmpFile); err != nil {
+			c.JSON(500, gin.H{"status": "error", "detail": err.Error()})
 			return
 		}
-
-		// 2. PANGGIL FUNGSI executePrint DI SINI (Inilah kuncinya!)
-		err := executePrint(tmpFile) // Memanggil fungsi yang berisi Debug Print & SumatraPDF
-
-		if err != nil {
-			// Jika error, kirimkan detailnya agar kita tahu masalahnya di mana
-			c.JSON(500, gin.H{
-				"status":  "error",
-				"message": "Gagal mencetak",
-				"detail":  err.Error(),
-			})
-			return
-		}
-
 		c.JSON(200, gin.H{"status": "success", "message": "Printing started"})
 	})
-
-	for _, route := range r.Routes() {
-		fmt.Printf("Method: %s, Path: %s, Name: %s\n", route.Method, route.Path, route.Handler)
-	}
 
 	// SERVER STARTUP
 	slog.Info("Server Photobooth berjalan", "port", cfg.AppPort)
@@ -185,22 +234,12 @@ func main() {
 func executePrint(filePath string) error {
 	if runtime.GOOS == "windows" {
 		printerName := "Brother HL-L5100DN series"
-
-		// 1. Pastikan file gambar BENAR-BENAR ada sebelum diprint
 		absImagePath, _ := filepath.Abs(filePath)
 		if _, err := os.Stat(absImagePath); os.IsNotExist(err) {
-			return fmt.Errorf("File gambar tidak ditemukan di: %s", absImagePath)
+			return fmt.Errorf("File gambar tidak ditemukan")
 		}
 
-		// 2. Gunakan alamat absolut untuk SumatraPDF
 		sumatraPath, _ := filepath.Abs("./SumatraPDF.exe")
-
-		// 3. LOGGING: Print perintah ke terminal Go agar bisa kamu copy-paste buat tes
-		fmt.Printf("\n--- DEBUG PRINT ---\n")
-		fmt.Printf("Command: %s -print-to \"%s\" -print-settings \"fit,paper=4r\" \"%s\"\n",
-			sumatraPath, printerName, absImagePath)
-		fmt.Printf("-------------------\n\n")
-
 		cmd := exec.Command(sumatraPath,
 			"-print-to", printerName,
 			"-print-settings", "fit,paper=A4",
@@ -211,8 +250,6 @@ func executePrint(filePath string) error {
 		if err != nil {
 			return fmt.Errorf("SumatraPDF Error: %s, Output: %s", err, string(output))
 		}
-
-		return nil
 	}
 	return nil
 }
