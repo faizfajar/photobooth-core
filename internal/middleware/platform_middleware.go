@@ -8,6 +8,7 @@ import (
 	// "photobooth-core/internal/platform/response"
 
 	"github.com/gin-contrib/cors"
+    "time"
 	"github.com/gin-gonic/gin"
 )
 
@@ -26,6 +27,7 @@ func CORS() gin.HandlerFunc {
         },
         ExposeHeaders:    []string{"Content-Length"},
         AllowCredentials: true,
+        MaxAge: 12 * time.Hour
     })
 }
 
