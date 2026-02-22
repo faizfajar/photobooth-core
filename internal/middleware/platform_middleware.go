@@ -14,7 +14,8 @@ import (
 // CORS setup untuk mengizinkan akses dari frontend (Web/Electron)
 func CORS() gin.HandlerFunc {
     return cors.New(cors.Config{
-        AllowAllOrigins:  true, 
+        AllowAllOrigins:  true,
+        AllowOrigins:     []string{"*"}, // sementara biar aman
         AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
         AllowHeaders: []string{
             "Origin", 
